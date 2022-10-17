@@ -2,12 +2,10 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_marshmallow import Marshmallow
 
-
-
 app = Flask(__name__)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql+psycopg2://tracey:123456@127.0.0.1:5432/dog_spa'
-app.config['JSON_SORT_KEY'] = False
+app.config['JSON_SORT_KEYS'] = False
 
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
@@ -30,8 +28,8 @@ class Groomer(db.Model):
     email = db.Column(db.String)
     phone = db.Column(db.String)
 
-class Appointment(db.Model):
-    __tablename__ = 'appointments'
+class Booking(db.Model):
+    __tablename__ = 'bookings'
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(db.Integer)
     groomer_id = db.Column(db.Integer)
@@ -79,7 +77,50 @@ def seed_table():
         breed= 'Cockatiel',
         phone= '194422',
         owner= 'Sammy'
-    )]
+    ),
+    Client(
+        name= 'Meredith',
+        animal_type= 'Cat',
+        breed= 'Scottish fold',
+        phone= '104722',
+        owner= 'Taylor'
+    ),
+    Client(
+        name= 'Olivia',
+        animal_type= 'Cat',
+        breed= 'Scottish fold',
+        phone= '104722',
+        owner= 'Taylor'
+    ),
+    Client(
+        name= 'Pig',
+        animal_type= 'Pig',
+        breed= 'Miniature',
+        phone= '247562',
+        owner= 'Miley'
+    ),
+    Client(
+        name= 'Toulouse',
+        animal_type= 'Dog',
+        breed= 'Beagel-Chihuahua',
+        phone= '247432',
+        owner= 'Ariana'
+    ),
+    Client(
+        name= 'Dora',
+        animal_type= 'Dog',
+        breed= 'Labradoodle',
+        phone= '364323',
+        owner= 'Liam'
+    ),
+    Client(
+        name= 'Smoke',
+        animal_type= 'Horse',
+        breed= 'Gidran',
+        phone= '285732',
+        owner= 'Channing'
+    )
+    ]
 
     groomers = [
     Groomer(
@@ -107,50 +148,50 @@ def seed_table():
         phone= '103635',
     )]
 
-    appointments = [ 
-    Appointment(
+    bookings = [ 
+    Booking(
         client_id= 1,
         groomer_id= 3,
         app_date= '2022-12-01',
         app_time= '12:35'
     ),
-    Appointment(
+    Booking(
         client_id= 2,
         groomer_id= 1,
         app_date= '2022-11-28',
         app_time= '10:15'
     ),
-    Appointment(
+    Booking(
         client_id= 3,
         groomer_id= 4,
         app_date= '2022-11-30',
         app_time= '13:00'
     ),
-    Appointment(
+    Booking(
         client_id= 4,
         groomer_id= 2,
         app_date= '2022-12-12',
         app_time= '12:35'
     ),
-    Appointment(
+    Booking(
         client_id= 1,
         groomer_id= 2,
         app_date= '2022-12-20',
         app_time= '14:25'
     ),
-    Appointment(
+    Booking(
         client_id= 4,
         groomer_id= 1,
         app_date= '2023-01-28',
         app_time= '10:00'
     ),
-    Appointment(
+    Booking(
         client_id= 3,
         groomer_id= 1,
         app_date= '2023-01-11',
         app_time= '10:10'
     ),
-    Appointment(
+    Booking(
         client_id= 1,
         groomer_id= 3,
         app_date= '2023-01-12',
@@ -159,19 +200,41 @@ def seed_table():
 
     db.session.add_all(clients)
     db.session.add_all(groomers)
-    db.session.add_all(appointments)
+    db.session.add_all(bookings)
     db.session.commit()
     print('Tables seeded!')
 
 class ClientSchema(ma.Schema):
     class Meta: 
-        fields = ('id', 'name', 'animal_type', 'breed', 'owner', 'phone')
+        fields = ('id', 'name', 'animal_type', 'breed')
+        # ordered = True
+
+class BookingSchema(ma.Schema):
+    class Meta: 
+        fields = ('id', 'client_id', 'groomer_id', 'app_date', 'app_time')
+        ordered = True
 
 @app.cli.command('clients')
 def get_clients():
     stmt = db.select(Client)
     clients = db.session.scalars(stmt)
-    print(ClientSchema(many=True).dump(clients))
+    [print(client.name, client.breed) for client in clients]
+    
+@app.route('/bookings/')
+def bookings():
+    stmt = db.select(Booking)
+    bookings = db.session.scalars(stmt)
+    bookings_details = []
+    for booking in bookings:
+        booking_details = dict({'id': booking.id, 'date' : booking.app_date})
+        bookings_details.append(booking_details)
+    return bookings_details
+
+@app.route('/booking/<int:booking_id>')
+def booking_lookup(booking_id):
+    stmt = db.select(Booking).filter_by(id = booking_id)
+    bookings = db.session.scalars(stmt)
+    return BookingSchema(many=True).dump(bookings)
 
 @app.route('/')
 def index():
