@@ -1,4 +1,4 @@
-Hi, this started as my personal project for practicing the lession. It is neither perfect or complete. Feel free to use your own solutions.
+Hi, this started as my personal project for practicing SQLAlchemy syntax. It is neither perfect or complete. Feel free to use your own solutions.
 
 1. After cloning the repo, install all the requirements in Requirements.txt.
 2. Create a PostgreSQL database for this exercise and connect to it.
