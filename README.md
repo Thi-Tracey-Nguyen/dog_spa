@@ -8,10 +8,10 @@ type in the terminal the below command to create and seed your tables.
 ``` flask create && flask seed```
 
 
-Your database will look like this:
+There are 3 tables: clients, groomers and bookings in the database and they look like this:
 ![tables in the database](docs/dog_spa%20tables.png)
 
-Questions:
+## Questions:
 
 1. Print all clients' names and what type of animal they are
 2. Return owner of Archie
