@@ -1,5 +1,16 @@
 Hi, this started as my personal project for practicing the lession. It is neither perfect or complete. Feel free to use your own solutions.
 
+1. After cloning the repo, install all the requirements in Requirements.txt.
+2. Create a PostgreSQL database for this exercise and connect to it.
+3. Then go back to the virtual environment and 
+type in the terminal the below command to create and seed your tables.
+
+``` flask create && flask seed```
+
+
+Your database will look like this:
+![tables in the database](docs/dog_spa%20tables.png)
+
 Questions:
 
 1. Print all clients' names and what type of animal they are
