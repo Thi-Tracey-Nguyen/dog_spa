@@ -59,12 +59,9 @@ clients = db.session.scalars(stmt).all()
 
 8. Only fingure out Psql so far, not alchemy yet. 
    
-Step 1. Create human_clients view: 
+stmt = db.select(Client.owner, db.func.count(Client.id)).select_from(Client).group_by(Client.owner).order_by(db.func.count(Client.id).desc()).limit(2) 
 
-create view human_client as select distinct ownerfrom clients; 
+clients = db.session.execute(stmt).all() 
 
-Step 2. Return the human client who has the most number of pets
-
-select owner, max(number_of_pets) from human_clients, (select max(number_of_pets) m from human_clients) max_pet where number_of_pets = max_pet.m group by owner;
-
-==> need to convert it into SQLAlchemy syntax somehow
+[print(client) for client in clients]
+*Note: have to use db.session.execute()

@@ -216,9 +216,7 @@ class BookingSchema(ma.Schema):
 
 @app.cli.command('clients')
 def get_clients():
-    stmt = db.select(Client)
-    clients = db.session.scalars(stmt)
-    [print(client.owner) for client in clients]
+    # Your code here
     
 @app.route('/bookings/')
 def bookings():
