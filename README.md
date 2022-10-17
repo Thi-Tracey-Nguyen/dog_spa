@@ -21,3 +21,7 @@ There are 3 tables: clients, groomers and bookings in the database and they look
 6. Print all the owners of clients
 7. Count all the human clients
 8. Return the name of owner(s) who owns the most pets as clients.
+
+More questions (no solutions yet):
+1. Who is the groomer with the most bookings in 2022 
+2. Return the clients who haven't made bookings for 2023
