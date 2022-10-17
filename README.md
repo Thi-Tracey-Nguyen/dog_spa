@@ -18,8 +18,8 @@ There are 3 tables: clients, groomers and bookings in the database and they look
 3. Return the owners of Smoke and Kookoo
 4. Return the clients' names and owners of 'oodle' dogs
 5. Return all distinct animal_types
-6. Print all the owners of clients
-7. Count all the human clients
+6. Print all the owners of clients (distinct)
+7. Count all the human clients (distinct)
 8. Return the name of owner(s) who owns the most pets as clients.
 
 More questions (no solutions yet):
