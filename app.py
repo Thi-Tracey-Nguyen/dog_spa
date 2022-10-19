@@ -2,18 +2,23 @@ from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import IntegrityError
 from flask_marshmallow import Marshmallow
+from datetime import date, timedelta
+from flask_bcrypt import Bcrypt
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 
 
 app = Flask(__name__)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql+psycopg2://tracey:123456@127.0.0.1:5432/dog_spa'
 app.config['JSON_SORT_KEYS'] = False
+app.config['JWT_SECRET_KEY'] = 'something secure'
 
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
+bcrypt = Bcrypt(app)
+jwt = JWTManager(app)
 
-
-class Client(db.Model): 
+class Client(db.Model):
     __tablename__ = 'clients'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String)
@@ -31,6 +36,7 @@ class Groomer(db.Model):
     email = db.Column(db.String, unique=True)
     phone = db.Column(db.Integer, unique=True)
 
+
 class Booking(db.Model):
     __tablename__ = 'bookings'
     id = db.Column(db.Integer, primary_key=True)
@@ -39,6 +45,14 @@ class Booking(db.Model):
     date = db.Column(db.Date)
     time = db.Column(db.Time)
 
+class User(db.Model):
+    __tablename__ = 'users'
+
+    id = db.Column(db.Integer, primary_key = True)
+    name = db.Column(db.String, default = 'user')
+    email = db.Column(db.String, nullable = False, unique=True)
+    password = db.Column(db.String, default = bcrypt.generate_password_hash('user123').decode('utf8'))
+    is_admin = db.Column(db.Boolean, default = False)
 
 @app.cli.command('create')
 def create_table():
@@ -238,9 +252,26 @@ def seed_table():
         time= '11:35'
     )]
 
+    admin = User(
+        name = 'admin',
+        email = 'admin@dog_spa.com',
+        password = bcrypt.generate_password_hash('admin123').decode('utf8'),
+        is_admin = True
+        )
+
+    # add groomers into users table with default name = user, password = user123 and is_admin is false
+    users = []
+    for groomer in groomers:
+        user = User(
+            email = groomer.email
+        )
+        users.append(user)
+
     db.session.add_all(clients)
     db.session.add_all(groomers)
     db.session.add_all(bookings)
+    db.session.add_all(users)
+    db.session.add(admin)
     db.session.commit()
     print('Tables seeded!')
 
@@ -259,25 +290,35 @@ class GroomerSchema(ma.Schema):
         fields = ('id', 'f_name', 'l_name', 'email', "phone")
         ordered = True
 
+# class UserSchema(ma.Schema):
+#     class Meta:
+#         fields = ('name', 'password')
+
+def authorize():
+    user_id = get_jwt_identity()
+    stmt = db.select(User).where(User.id == user_id)
+    user = db.session.scalar(stmt)
+    return user.is_admin
+
 @app.route('/')
 def index():
     return 'Welcome to Dog Spa'
 
 @app.route('/bookings/')
+@jwt_required()
 def bookings():
-    stmt = db.select(Booking)
-    bookings = db.session.scalars(stmt)
-    bookings_details = []
-    for booking in bookings:
-        booking_details = dict({'id': booking.id, 'date' : booking.date})
-        bookings_details.append(booking_details)
-    return bookings_details
+    if authorize():
+        stmt = db.select(Booking)
+        bookings = db.session.scalars(stmt)
+        return BookingSchema(many=True).dump(bookings)
+    else: 
+        return {"Error": "Access denied"}, 403
 
 @app.route('/booking/<int:booking_id>')
 def booking_lookup(booking_id):
     stmt = db.select(Booking).filter_by(id = booking_id)
-    bookings = db.session.scalars(stmt)
-    return BookingSchema(many=True).dump(bookings)
+    bookings = db.session.scalar(stmt)
+    return BookingSchema().dump(bookings)
 
 @app.route('/bookings/groomer/<int:groomer_id>/')
 def get_schedule(groomer_id):
@@ -285,35 +326,72 @@ def get_schedule(groomer_id):
     schedule = db.session.scalars(stmt)
     return BookingSchema(many=True).dump(schedule)
 
-@app.route('/add_groomer/', methods=['POST'])
+@app.route('/auth/add_groomer/', methods=['POST'])
+@jwt_required()
 def add_groomer():
-    try: 
-        groomer_info = GroomerSchema().load(request.json)
-        new_groomer = Groomer(
-            f_name = groomer_info['f_name'],
-            l_name = groomer_info['l_name'],
-            phone = groomer_info['phone'],
-            email = groomer_info['email']
-        )
-        db.session.add(new_groomer)
-        db.session.commit()
-        return GroomerSchema().dump(new_groomer), 201
-    except IntegrityError:
-        return {"Error": "Email already in use"}, 409
+    if authorize():
+        try: 
+            groomer_info = GroomerSchema().load(request.json)
+            new_groomer = Groomer(
+                f_name = groomer_info['f_name'],
+                l_name = groomer_info['l_name'],
+                phone = groomer_info['phone'],
+                email = groomer_info['email'],
+            )
+            new_user = User(
+                email = request.json['email'],
+            )
+            db.session.add(new_groomer)
+            db.session.add(new_user)
+            db.session.commit()
+            return GroomerSchema().dump(new_groomer), 201
+        except IntegrityError:
+            return {"Error": "Email already in use"}, 409
+    else:
+        return {"Error": "No permission"}, 403
 
-@app.route("/add_client/", methods=["POST"])
+@app.route("/auth/add_client/", methods=["POST"])
+@jwt_required()
 def add_client():
-    client_info = ClientSchema().load(request.json)
+    #extract user's id out of the token so identify them
+    user_id = get_jwt_identity()
+    stmt = db.select(User).filter_by(id = user_id)
+    user = db.session.scalar(stmt)
+    if not user.is_admin:
+        return {'Error': 'Unauthorized action'}, 404
+
     new_client = Client(
-        name = client_info['name'],
-        animal_type = client_info['animal_type'],
-        breed = client_info['breed'],
-        owner = client_info['owner'],
-        phone = client_info['phone']
+        name = request.json['name'],
+        animal_type = request.json['animal_type'],
+        breed = request.json['breed'],
+        owner = request.json['owner'],
+        phone = request.json['phone']
     )
     db.session.add(new_client)
     db.session.commit()
     return ClientSchema().dump(new_client), 201
+        
+
+@app.route('/auth/login/', methods=['POST'])
+def login():
+    stmt = db.select(User).where(User.email == request.json["email"])
+    user = db.session.scalar(stmt)
+    if user and bcrypt.check_password_hash(user.password, request.json['password']):
+        token = create_access_token(identity=user.id, expires_delta = timedelta(days=1))
+        return {"message": f"Log in successfully as {user.name}", "token": token}
+    else:
+        return {'message': 'Invalid username or password'}
+
+# @app.route('/auth/new_user/', methods=['POST'])
+# def new_user():
+#     new_user = User(
+#         name = request.json['name'],
+#         password = bcrypt.generate_password_hash(request.json['password']).decode('utf8')
+#     )
+#     db.session.add(new_user)
+#     db.session.commit()
+
+#     return UserSchema(exclude=['password']).dump(new_user)
 
 if __name__ == '__main__':
     app.run()
